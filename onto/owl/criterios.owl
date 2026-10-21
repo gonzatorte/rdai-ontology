@@ -1,0 +1,268 @@
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+     xml:base="http://aigdai.criterios.owl/"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     ontologyIRI="http://aigdai.criterios.owl"
+     versionIRI="http://aigdai.criterios.owl/v0.1">
+    <Prefix name="" IRI="http://aigdai.criterios.owl/"/>
+    <Prefix name="base" IRI="http://aigdai.base.owl/"/>
+    <Prefix name="owl" IRI="http://www.w3.org/2002/07/owl#"/>
+    <Prefix name="rdf" IRI="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>
+    <Prefix name="xml" IRI="http://www.w3.org/XML/1998/namespace"/>
+    <Prefix name="xsd" IRI="http://www.w3.org/2001/XMLSchema#"/>
+    <Prefix name="rdfs" IRI="http://www.w3.org/2000/01/rdf-schema#"/>
+    <Prefix name="dcterms" IRI="http://purl.org/dc/terms/"/>
+    <Prefix name="fairvoc" IRI="https://w3id.org/fair/principles/terms/"/>
+    <Import>http://aigdai.base.owl</Import>
+
+    <Declaration>
+        <Class IRI="criterio_de_calidad"/>
+    </Declaration>
+    <SubClassOf>
+        <Class IRI="criterio_de_calidad"/>
+        <Class abbreviatedIRI="owl:Thing"/>
+    </SubClassOf>
+
+    <Declaration>
+        <Class IRI="grupo_de_criterio"/>
+    </Declaration>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>grupo_de_criterio</IRI>
+        <Literal xml:lang="es">grupo de criterio</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>grupo_de_criterio</IRI>
+        <Literal xml:lang="en">criteria group</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>grupo_de_criterio</IRI>
+        <Literal xml:lang="es">categoría de criterio</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>grupo_de_criterio</IRI>
+        <Literal xml:lang="en">criteria category</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>grupo_de_criterio</IRI>
+        <Literal xml:lang="es">Categoría que agrupa criterios de calidad afines dentro de un mismo marco (p. ej. la dimensión de transparencia de TRUST).</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>grupo_de_criterio</IRI>
+        <Literal xml:lang="en">Category grouping related quality criteria within the same framework (e.g. the TRUST transparency dimension).</Literal>
+    </AnnotationAssertion>
+    <SubClassOf>
+        <Class IRI="grupo_de_criterio"/>
+        <Class abbreviatedIRI="owl:Thing"/>
+    </SubClassOf>
+
+    <Declaration>
+        <ObjectProperty IRI="considera_criterio"/>
+    </Declaration>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="considera_criterio"/>
+        <Class IRI="criterio_de_calidad"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="considera_criterio"/>
+        <Class IRI="criterio_de_calidad"/>
+    </ObjectPropertyRange>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>considera_criterio</IRI>
+        <Literal xml:lang="es">considera criterio</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>considera_criterio</IRI>
+        <Literal xml:lang="en">considers criterion</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>considera_criterio</IRI>
+        <Literal xml:lang="es">toma en cuenta criterio</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>considera_criterio</IRI>
+        <Literal xml:lang="en">takes into account criterion</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>considera_criterio</IRI>
+        <Literal xml:lang="es">Indica que un criterio de calidad tiene en cuenta o se alinea con otro, sin que necesariamente lo implique (p. ej. una certificación que considera los principios FAIR).</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>considera_criterio</IRI>
+        <Literal xml:lang="en">States that a quality criterion takes into account or is aligned with another, without necessarily implying it (e.g. a certification that considers the FAIR principles).</Literal>
+    </AnnotationAssertion>
+
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="extiende_de_criterio"/>
+        <ObjectProperty IRI="considera_criterio"/>
+    </SubObjectPropertyOf>
+    <Declaration>
+        <ObjectProperty IRI="extiende_de_criterio"/>
+    </Declaration>
+    <TransitiveObjectProperty>
+        <ObjectProperty IRI="extiende_de_criterio"/>
+    </TransitiveObjectProperty>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>extiende_de_criterio</IRI>
+        <Literal xml:lang="en">extends from criterion</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>extiende_de_criterio</IRI>
+        <Literal xml:lang="es">extiende de criterio</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>extiende_de_criterio</IRI>
+        <Literal xml:lang="es">especializa criterio</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>extiende_de_criterio</IRI>
+        <Literal xml:lang="en">refines criterion</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>extiende_de_criterio</IRI>
+        <Literal xml:lang="es">Indica que un criterio de calidad es un componente o especialización más concreta de otro más general (p. ej. una métrica de TRUST respecto de TRUST).</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>extiende_de_criterio</IRI>
+        <Literal xml:lang="en">States that a quality criterion is a more concrete component or specialization of a more general one (e.g. a TRUST metric with respect to TRUST).</Literal>
+    </AnnotationAssertion>
+
+    <Declaration>
+        <ObjectProperty IRI="criterio_pertenece_a_grupo"/>
+    </Declaration>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>criterio_pertenece_a_grupo</IRI>
+        <Literal xml:lang="es">criterio pertenece a grupo</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>criterio_pertenece_a_grupo</IRI>
+        <Literal xml:lang="en">criterion belongs to group</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>criterio_pertenece_a_grupo</IRI>
+        <Literal xml:lang="es">Relaciona un criterio de calidad con el grupo o categoría al que pertenece dentro de su marco.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>criterio_pertenece_a_grupo</IRI>
+        <Literal xml:lang="en">Links a quality criterion to the group or category it belongs to within its framework.</Literal>
+    </AnnotationAssertion>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="criterio_pertenece_a_grupo"/>
+        <Class IRI="criterio_de_calidad"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="criterio_pertenece_a_grupo"/>
+        <Class IRI="grupo_de_criterio"/>
+    </ObjectPropertyRange>
+
+    <Declaration>
+        <DataProperty IRI="criterio_tiene_descripcion"/>
+    </Declaration>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>criterio_tiene_descripcion</IRI>
+        <Literal xml:lang="es">criterio tiene descripción</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>criterio_tiene_descripcion</IRI>
+        <Literal xml:lang="en">criterion has description</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>criterio_tiene_descripcion</IRI>
+        <Literal xml:lang="es">enunciado del criterio</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>criterio_tiene_descripcion</IRI>
+        <Literal xml:lang="en">criterion statement</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>criterio_tiene_descripcion</IRI>
+        <Literal xml:lang="es">Enunciado textual del criterio de calidad, tal como lo formula el marco de origen.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>criterio_tiene_descripcion</IRI>
+        <Literal xml:lang="en">Text statement of the quality criterion, as formulated by the source framework.</Literal>
+    </AnnotationAssertion>
+    <DataPropertyDomain>
+        <DataProperty IRI="criterio_tiene_descripcion"/>
+        <Class IRI="criterio_de_calidad"/>
+    </DataPropertyDomain>
+    <DataPropertyRange>
+        <DataProperty IRI="criterio_tiene_descripcion"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>criterio_de_calidad</IRI>
+        <Literal xml:lang="es">criterio de calidad</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:nombre_usual"/>
+        <IRI>criterio_de_calidad</IRI>
+        <Literal xml:lang="en">quality criterion</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>criterio_de_calidad</IRI>
+        <Literal xml:lang="es">principio de calidad</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>criterio_de_calidad</IRI>
+        <Literal xml:lang="es">requisito de calidad</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>criterio_de_calidad</IRI>
+        <Literal xml:lang="en">quality principle</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:sinonimo"/>
+        <IRI>criterio_de_calidad</IRI>
+        <Literal xml:lang="en">quality requirement</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>criterio_de_calidad</IRI>
+        <Literal xml:lang="es">Condición que permite evaluar la calidad de un repositorio o de sus contenidos. Abarca desde principios generales (p. ej. FAIR, TRUST) hasta certificaciones (p. ej. CoreTrustSeal) y lineamientos concretos de financiadores o revistas. Los criterios se descomponen en partes atómicas o métricas, que se relacionan entre sí para trazar equivalencias entre marcos distintos. Un repositorio satisface un criterio según las funcionalidades que provee.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="base:descripcion"/>
+        <IRI>criterio_de_calidad</IRI>
+        <Literal xml:lang="en">Condition allowing to assess the quality of a repository or its contents. It ranges from general principles (e.g. FAIR, TRUST) to certifications (e.g. CoreTrustSeal) and concrete guidelines from funders or journals. Criteria are broken down into atomic parts or metrics, related to each other to trace equivalences between different frameworks. A repository satisfies a criterion according to the features it provides.</Literal>
+    </AnnotationAssertion>
+</Ontology>
+
+
+
+<!-- Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi -->
+

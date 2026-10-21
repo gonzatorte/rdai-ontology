@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+     xml:base="http://aigdai.owx#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     ontologyIRI="http://aigdai.owx"
+     versionIRI="http://aigdai.owx/v0.1">
+    <Import>file:///home/gonzalo/workspace/propio/AIGDAI/aigdai-core/onto/owl/aigdai-tbox.owl</Import>
+    <Import>file:///home/gonzalo/workspace/propio/AIGDAI/aigdai-core/onto/owl/criterios.xml</Import>
+    <Import>file:///home/gonzalo/workspace/propio/AIGDAI/aigdai-core/onto/owl/commons.xml</Import>
+    <Import>file:///home/gonzalo/workspace/propio/AIGDAI/aigdai-core/onto/owl/disciplinas.xml</Import>
+    <Import>file:///home/gonzalo/workspace/propio/AIGDAI/aigdai-core/onto/owl/localizaciones.xml</Import>
+    <Import>file:///home/gonzalo/workspace/propio/AIGDAI/aigdai-core/onto/owl/organizaciones.xml</Import>
+    <Import>file:///home/gonzalo/workspace/propio/AIGDAI/aigdai-core/onto/owl/repositorios.xml</Import>
+</Ontology>

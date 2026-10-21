@@ -1,0 +1,14 @@
+
+# The ${...} variables are interpolated from the .env file in this folder.
+# Always invoke with the explicit file: docker compose --env-file .env -f docker-compose-jena.yml ...
+services:
+  fuseki:
+    image: stain/jena-fuseki:5.1.0
+    container_name: st_fuseki
+    restart: no
+    environment:
+      ADMIN_PASSWORD: ${FUSEKI_ADMIN_PASSWORD:?definir FUSEKI_ADMIN_PASSWORD en .env (ver .env.example)}
+    volumes:
+      - ./fuseki-data:/fuseki
+    ports:
+      - "3030:3030"

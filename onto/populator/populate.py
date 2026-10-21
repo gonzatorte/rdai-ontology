@@ -1,0 +1,443 @@
+from settings import JENA_DATASET
+from lib import chunks
+import argparse
+import asyncio
+from onto.populator.common import seed_commons, seed_locaciones
+from onto.populator.jena_client import JenaClient
+from onto.populator.ontology import ontology_graph
+from onto.populator.sources.datacite import DataCiteSource
+from onto.populator.sources.dummy import DummySource
+from onto.populator.sources.fairsharing import FairSharingSource
+from onto.populator.sources.re3data import seed_disciplinas, Re3DataSource
+import onto.cts as cts
+import onto.populator.rdf_types as rdf_types
+from lib.no_relational_database import get_database_client
+from rdflib import Graph, Literal
+from rdflib.namespace import RDF, OWL, XSD
+from rdflib.plugins.sparql import prepareQuery
+from ror.extractor import insert_on_rdf as ror_insert_on_rdf
+
+ALL_SOURCES = ('re3data', 'fairsharing', 'datacite', 'dummy')
+DEFAULT_SOURCES = ('re3data', 'fairsharing', 'datacite')
+ALL_SEEDS = ('commons', 'locaciones')
+DEFAULT_SEEDS = ()
+DEFAULT_REDUCED_LIMIT = 500
+
+
+def walk_dummy(gg: Graph):
+    source = DummySource(gg)
+    source.process()
+
+def walk_datacite(gg: Graph, reduced: bool=False, skip: int=None, limit: int=None):
+    database = get_database_client()
+
+    source = DataCiteSource(gg)
+    source.mappings()
+
+    col_datacite = database['datacite']
+    skip_count = skip if skip is not None else 0
+    limit_count = limit if limit is not None else (DEFAULT_REDUCED_LIMIT if reduced else 0)
+    instances = col_datacite.find({}).sort({'_id': -1}).skip(skip_count).limit(limit_count)
+    total = col_datacite.count_documents({})
+    for idx, r_info in enumerate(instances):
+        source.process(r_info)
+        if idx % 20 == 0:
+            print("ready %s out of %s" % (idx, total))
+
+
+def walk_fairsharing(gg: Graph, reduced: bool=False, skip: int=None, limit: int=None):
+    database = get_database_client()
+
+    source = FairSharingSource(gg)
+
+    if not reduced:
+        col_subjects = database['fs_subjects']
+        subjects = col_subjects.find({}).sort({'_id': -1})
+        source.process_subjects(list(subjects))
+
+    skip_org_count = skip if skip is not None else (100 if reduced else 0)
+    limit_org_count = limit if limit is not None else (500 if reduced else -1)
+    col_orgs = database['fs_orgs']
+    orgs = col_orgs.find({}).sort({'_id': -1}).skip(skip_org_count).limit(limit_org_count)
+    org_list = list(orgs)
+    print("loading", len(org_list), "orgs")
+    source.process_orgs(org_list)
+
+    if not reduced:
+        col_licence = database['fs_licence']
+        licences = col_licence.find({}).sort({'_id': -1})
+        source.process_licencia(list(licences))
+
+    if not reduced:
+        col_keyword = database['fs_keyword']
+        keywords = col_keyword.find({}).sort({'_id': -1})
+        source.process_keywords(list(keywords))
+
+    col_registry = database['fs_registry']
+    skip_count = skip if skip is not None else (1000 if reduced else 0)
+    limit_count = limit if limit is not None else (200 if reduced else -1)
+    instances = col_registry.find({}).sort({'_id': -1}).skip(skip_count).limit(limit_count)
+    total = col_registry.count_documents({})
+    for idx, r_info in enumerate(instances):
+        source.process_registry(r_info, reduced)
+        if idx % 20 == 0:
+            print("ready %s out of %s" % (idx, total))
+
+
+def walk_re3data(g_repos: Graph, reduced: bool=False, skip: int=None, limit: int=None):
+    database = get_database_client()
+    raw_drepo_collection = database['raw_drepo_2']
+    skip_count = skip if skip is not None else 0
+    limit_count = limit if limit is not None else (500 if reduced else -1)
+    instances = raw_drepo_collection.find({}).sort({'idd': -1}).skip(skip_count).limit(limit_count)
+    # instances_count = raw_drepo_collection.count_documents({})
+
+    source = Re3DataSource(g_repos)
+    repository_infos = source.refine_iterator(instances)
+    total = len(repository_infos)
+    counter = 0
+    for r_info in repository_infos:
+        source.process(r_info, reduced)
+        counter += 1
+        if counter % 20 == 0:
+            print("ready %s out of %s" % (counter, total))
+
+
+def refine_and_insert_on_rdf(sources=DEFAULT_SOURCES, seeds=DEFAULT_SEEDS, reduced: bool=True, skip: int=None, limit: int=None):
+    (g_criterios, ) = seed_criterios()
+    (g_disciplinas, ) = seed_disciplinas()
+    g_commons = Graph()
+    g_commons.bind('', rdf_types.my_ns)
+    if 'commons' in seeds:
+        seed_commons(g_commons)
+    g_locaciones = Graph()
+    g_locaciones.bind('', rdf_types.my_ns)
+    if 'locaciones' in seeds:
+        seed_locaciones(g_locaciones)
+
+    g_repos = Graph()
+    g_repos.bind('', rdf_types.my_ns)
+    if 'dummy' in sources:
+        walk_dummy(g_repos)
+    if 're3data' in sources:
+        walk_re3data(g_repos, reduced, skip, limit)
+    if 'fairsharing' in sources:
+        walk_fairsharing(g_repos, reduced, skip, limit)
+    if 'datacite' in sources:
+        walk_datacite(g_repos, reduced, skip, limit)
+
+    id_repo_same_as_query = prepareQuery("""
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX dai: <http://aigdai.tbox.owl/>
+
+        SELECT DISTINCT ?id1 ?id2
+        WHERE {
+          ?id1 dai:id_de_repositorio_tiene_literal ?l1 .
+          ?id2 dai:id_de_repositorio_tiene_literal ?l2 .
+          ?id2 dai:id_de_repositorio_tiene_catalogo ?cat .
+          ?id2 dai:id_de_repositorio_tiene_catalogo ?cat .
+          ?id1 dai:id_de_repositorio_tiene_repositorio ?r1 .
+          ?id2 dai:id_de_repositorio_tiene_repositorio ?r2 .
+          FILTER (?r1 != ?r2) .
+          FILTER (?l1 = ?l2) .
+        } ORDER BY DESC(?id1) DESC(?id2) LIMIT 10""", initNs={'my': rdf_types.my_ns, 'rdf': RDF, '': 'http://aigdai.tbox.owl/'})
+    id_repo_same_as_generator = g_repos.query(id_repo_same_as_query)
+    for id_repo_same in id_repo_same_as_generator:
+        g_repos.add((id_repo_same[0], OWL.sameAs, id_repo_same[1]))
+
+    repo_same_as_query = prepareQuery("""
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX dai: <http://aigdai.tbox.owl/>
+        
+        SELECT DISTINCT ?r1 ?r2
+        WHERE {
+          ?id1 dai:id_de_repositorio_tiene_repositorio ?r1 .
+          ?id1 dai:id_de_repositorio_tiene_repositorio ?r2 .
+          FILTER (?r1 != ?r2) .
+        } ORDER BY DESC(?r1) DESC(?r2)""", initNs={'my': rdf_types.my_ns, 'rdf': RDF, '': 'http://aigdai.tbox.owl/'})
+    repo_same_as_generator = g_repos.query(repo_same_as_query)
+    for repo_same in repo_same_as_generator:
+        g_repos.add((repo_same[0], OWL.sameAs, repo_same[1]))
+
+    return (
+        g_repos,
+        g_commons,
+        g_criterios,
+        g_disciplinas,
+        g_locaciones,
+    )
+
+
+def seed_criterios():
+    g = Graph()
+    g.bind('', rdf_types.principles_ns)
+
+    # ToDo: I have to declare at least all the certifications (not "other") from re3data and datacite as quality criteria
+    # session.add_all([
+    #     Certificacion(
+    #         id=x['id'],
+    #         nombre=x['name'],
+    #     ) for x in CERTIFICACIONES
+    # ])
+
+    for (target_id, name, url) in cts.criterios_de_calidad:
+        target = rdf_types.CriterioDeCalidad.child_uri_ref(target_id)
+        g.add((target, RDF.type, rdf_types.CriterioDeCalidad))
+
+    for (target_criterio_id, criterios_extends_to, criterios_considered) in cts.criterio_de_calidad_extiende_de:
+        target_criterio = rdf_types.CriterioDeCalidad.child_uri_ref(target_criterio_id)
+        g.add((target_criterio, RDF.type, rdf_types.CriterioDeCalidad))
+        for criterio_extends_to_id in criterios_extends_to:
+            criterio_extends_to = rdf_types.CriterioDeCalidad.child_uri_ref(criterio_extends_to_id)
+            g.add((criterio_extends_to, RDF.type, rdf_types.CriterioDeCalidad))
+            g.add((target_criterio, rdf_types.extiende_de_criterio, criterio_extends_to))
+
+        for criterio_considered_id in criterios_considered:
+            criterio_considered = rdf_types.CriterioDeCalidad.child_uri_ref(criterio_considered_id)
+            g.add((criterio_considered, RDF.type, rdf_types.CriterioDeCalidad))
+            g.add((target_criterio, rdf_types.considera_criterio, criterio_considered))
+
+    # ToDo: same_individuals
+
+    trust = rdf_types.CriterioDeCalidad.child_uri_ref('trust')
+    # ToDo: Map related_with_funcionalidad
+    for (target_id, category, description, related_with_funcionalidad) in cts.metricas_trust:
+        target = rdf_types.CriterioDeCalidad.child_uri_ref(target_id)
+        g.add((target, RDF.type, rdf_types.CriterioDeCalidad))
+        g.add((target, rdf_types.criterio_tiene_descripcion, Literal(description, datatype=XSD.string)))
+        g.add((target, rdf_types.extiende_de_criterio, trust))
+
+        grupo_de_criterio = rdf_types.CriterioDeCalidad.child_uri_ref(category)
+        g.add((grupo_de_criterio, RDF.type, rdf_types.GrupoDeCriterio))
+        # ToDo: It still has to be stated which criterio_de_calidad has that grupo_de_criterio
+
+    plan_s = rdf_types.CriterioDeCalidad.child_uri_ref("plan_s")
+    # ToDo: Map importance to model
+    for (target_id, _, description, importance, related_with_funcionalidad) in cts.metricas_plan_s:
+        target = rdf_types.CriterioDeCalidad.child_uri_ref(target_id)
+        g.add((target, RDF.type, rdf_types.CriterioDeCalidad))
+        g.add((target, rdf_types.criterio_tiene_descripcion, Literal(description, datatype=XSD.string)))
+        g.add((target, rdf_types.extiende_de_criterio, plan_s))
+
+    cts_2022 = rdf_types.CriterioDeCalidad.child_uri_ref("cts_2022")
+    for (target_id, category, name, description) in cts.metricas_cts_2022:
+        target = rdf_types.CriterioDeCalidad.child_uri_ref(target_id)
+        g.add((target, RDF.type, rdf_types.CriterioDeCalidad))
+        g.add((target, rdf_types.criterio_tiene_descripcion, Literal("%s - %s" % (name, description), datatype=XSD.string)))
+        g.add((target, rdf_types.extiende_de_criterio, cts_2022))
+
+        grupo_de_criterio = rdf_types.GrupoDeCriterio.child_uri_ref(category)
+        g.add((grupo_de_criterio, RDF.type, rdf_types.GrupoDeCriterio))
+        # ToDo: It still has to be stated which criterio_de_calidad has that grupo_de_criterio
+
+    criterio_de_calidad_coar = rdf_types.CriterioDeCalidad.child_uri_ref("coar_v1")
+    # ToDo: Map importance to model
+    for (target_id, category, description, importance, related_with_criterios) in cts.metricas_coar:
+        target = rdf_types.CriterioDeCalidad.child_uri_ref(target_id)
+        g.add((target, RDF.type, rdf_types.CriterioDeCalidad))
+        g.add((target, rdf_types.criterio_tiene_descripcion, Literal(description, datatype=XSD.string)))
+        g.add((target, rdf_types.extiende_de_criterio, criterio_de_calidad_coar))
+
+        grupo_de_criterio = rdf_types.GrupoDeCriterio.child_uri_ref(category)
+        g.add((grupo_de_criterio, RDF.type, rdf_types.GrupoDeCriterio))
+        # ToDo: It still has to be stated which criterio_de_calidad has that grupo_de_criterio
+
+    fair = rdf_types.CriterioDeCalidad.child_uri_ref("fair")
+    # for (target_id, _) in cts.metricas_fair:
+    #     # ToDo: I have to relate (same as) to https://w3id.org/fair/principles/terms/ from https://peta-pico.github.io/FAIR-nanopubs/principles/ontology.xml
+    #     pass
+    for (target_id, _) in cts.fair_maturity_models:
+        target = rdf_types.CriterioDeCalidad.child_uri_ref(target_id)
+        g.add((target, RDF.type, rdf_types.CriterioDeCalidad))
+        g.add((target, rdf_types.extiende_de_criterio, fair))
+    rda_fair_maturity_model = rdf_types.CriterioDeCalidad.child_uri_ref("rda_fair_maturity_model")
+    fsf_fair_maturity_model = rdf_types.CriterioDeCalidad.child_uri_ref("fsf_fair_maturity_model")
+    # ToDo: Build the DSM
+    # dsm_fair_maturity_model = rdf_types.CriterioDeCalidad.child_uri_ref("dsm_fair_maturity_model")
+    for (parent_maturity_model, statements) in [
+        (rda_fair_maturity_model, cts.rda_fair_maturity_model_statements),
+        (fsf_fair_maturity_model, cts.fsf_fair_maturity_model_statements),
+    ]:
+        # ToDo: Map metadata_or_data?
+        for statement in statements:
+            if len(statement) == 5:
+                (parent_id, target_id, metadata_or_data, description, importance) = statement
+            elif len(statement) == 6:
+                (parent_id, target_id, metadata_or_data, name, description, importance) = statement
+                description = "%s - %s" % (name, description)
+            else:
+                raise Exception()
+            target = rdf_types.CriterioDeCalidad.child_uri_ref(target_id)
+            g.add((target, RDF.type, rdf_types.CriterioDeCalidad))
+            parent = rdf_types.CriterioDeCalidad.child_uri_ref(parent_id)
+            g.add((parent, RDF.type, rdf_types.CriterioDeCalidad))
+            g.add((target, rdf_types.criterio_tiene_descripcion, Literal(description, datatype=XSD.string)))
+            g.add((target, rdf_types.extiende_de_criterio, parent))
+            g.add((target, rdf_types.extiende_de_criterio, parent_maturity_model))
+
+    posi = rdf_types.CriterioDeCalidad.child_uri_ref("posi")
+    for (target_id, category, description, importance, parents) in cts.metricas_posi:
+        target = rdf_types.CriterioDeCalidad.child_uri_ref(target_id)
+        g.add((target, RDF.type, rdf_types.CriterioDeCalidad))
+
+        # ToDo: It still has to be stated which criterio_de_calidad has that grupo_de_criterio
+        grupo_de_criterio = rdf_types.GrupoDeCriterio.child_uri_ref(category)
+        g.add((grupo_de_criterio, RDF.type, rdf_types.GrupoDeCriterio))
+
+        g.add((target, rdf_types.criterio_tiene_descripcion, Literal(description, datatype=XSD.string)))
+        g.add((target, rdf_types.extiende_de_criterio, posi))
+
+    return (g,)
+
+
+def extract_ror_involved_orgs(gg: Graph):
+    orgs_types_literals_query = prepareQuery("""
+    SELECT DISTINCT ?o ?t ?l
+    WHERE {
+      ?i rdf:type :id_de_organizacion .
+      ?i :id_de_organizacion_tiene_tipo ?t .
+      ?i :id_de_organizacion_tiene_literal ?l .
+      ?i :id_de_organizacion_tiene_organizacion ?o
+    }""", initNs={'my': rdf_types.my_ns, 'rdf': RDF, '': 'http://aigdai.tbox.owl/'})
+    orgs_types_literals = {"%s:%s" % (tt.replace('http://aigdai.tbox.owl/tipo_de_id_de_organizacion/', '').upper(), ll.value) for (_, tt, ll) in gg.query(orgs_types_literals_query)}
+    return ror_insert_on_rdf(orgs_types_literals)
+
+
+def serialize_file(**kwargs):
+    g_repos, g_commons, g_criterios, g_disciplinas, g_locaciones = refine_and_insert_on_rdf(**kwargs)
+    gg = Graph()
+    gg.bind('', rdf_types.my_ns)
+    gg += g_commons
+    gg += g_locaciones
+    gg += g_criterios
+    gg += g_disciplinas
+    gg += g_repos
+
+    g_orgs = extract_ror_involved_orgs(gg)
+    gg += g_orgs
+
+    g_repos.serialize(destination='onto/owl/repositorios.xml', format="xml")
+    g_criterios.serialize(destination='onto/owl/criterios.xml', format="xml")
+    g_disciplinas.serialize(destination='onto/owl/disciplinas.xml', format="xml")
+    g_commons.serialize(destination='onto/owl/commons.xml', format="xml")
+    g_locaciones.serialize(destination='onto/owl/localizaciones.xml', format="xml")
+    g_orgs.serialize(destination='onto/owl/organizaciones.xml', format="xml")
+    gg.serialize(destination='onto/owl/all_2.xml', format="xml")
+
+
+async def serialize_jena(**kwargs):
+    g_repos, g_commons, g_criterios, g_disciplinas, g_locaciones = refine_and_insert_on_rdf(**kwargs)
+    gg = Graph()
+    gg.bind('', rdf_types.my_ns)
+    gg += g_commons
+    gg += g_locaciones
+    gg += g_criterios
+    gg += g_disciplinas
+    gg += g_repos
+
+    g_orgs = extract_ror_involved_orgs(gg)
+    gg += g_orgs
+
+    offset = 0
+    items_query = prepareQuery(f"""
+        SELECT DISTINCT ?s ?p ?o
+        WHERE {{
+          ?s ?p ?o
+        }} ORDER BY DESC(?s) DESC(?p) DESC(?o) OFFSET {offset}""", initNs={'my': rdf_types.my_ns, 'rdf': RDF, '': 'http://aigdai.tbox.owl/'})
+    items_generator = gg.query(items_query)
+    items_count = gg.query(prepareQuery("""
+        SELECT (COUNT(DISTINCT *) AS ?count)
+        WHERE {
+            ?s ?p ?o .
+        }""", initNs={'my': rdf_types.my_ns, 'rdf': RDF, '': 'http://aigdai.tbox.owl/'}))
+    items_count = int(items_count.result[0][0].value) - offset
+    CHUNKS_SIZE = 80
+    chunk_generator = chunks(iter(items_generator), CHUNKS_SIZE)
+    async with JenaClient(JENA_DATASET, {'my': rdf_types.my_ns, 'rdf': RDF, '': 'http://aigdai.tbox.owl/'}) as client:
+        for (idx, ch) in enumerate(chunk_generator):
+            await client.insert_many(ch)
+            if (idx + 1) % 10 == 0:
+                print("%s out of %s" % (CHUNKS_SIZE * (idx + 1), items_count))
+
+
+async def serialize_schema_jena():
+    schema_items_query = prepareQuery("""
+        SELECT DISTINCT ?s ?p ?o
+        WHERE {
+          ?s ?p ?o
+        } ORDER BY DESC(?s) DESC(?p) DESC(?o)""", initNs={'my': rdf_types.my_ns, 'rdf': RDF, '': 'http://aigdai.tbox.owl/'})
+    schema_items_generator = ontology_graph.query(schema_items_query)
+    schema_items_count = ontology_graph.query(prepareQuery("""
+        SELECT (COUNT(DISTINCT *) AS ?count)
+        WHERE {
+            ?s ?p ?o .
+        }""", initNs={'my': rdf_types.my_ns, 'rdf': RDF, '': 'http://aigdai.tbox.owl/'}))
+    schema_items_count = schema_items_count.result[0][0].value
+    CHUNKS_SIZE = 80
+    schema_chunk_generator = chunks(iter(schema_items_generator), CHUNKS_SIZE)
+    async with JenaClient(JENA_DATASET, {'my': rdf_types.my_ns, 'rdf': RDF, '': 'http://aigdai.tbox.owl/'}) as client:
+        for (idx, ch) in enumerate(schema_chunk_generator):
+            await client.insert_many(ch)
+            if (idx + 1) % 10 == 0:
+                print("%s out of %s" % (CHUNKS_SIZE * (idx + 1), schema_items_count))
+
+
+async def serialize_all(**kwargs):
+    await serialize_schema_jena()
+    await serialize_jena(**kwargs)
+
+
+def _comma_separated(valid: tuple, name: str):
+    def parse(raw: str):
+        if raw.strip() in ('', 'none'):
+            return ()
+        values = tuple(x.strip() for x in raw.split(',') if x.strip())
+        unknown = [x for x in values if x not in valid]
+        if unknown:
+            raise argparse.ArgumentTypeError('%s invalid: %s. Options: %s' % (name, ', '.join(unknown), ', '.join(valid)))
+        return values
+    return parse
+
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description='Populates the knowledge base from the raw data in Mongo.')
+    parser.add_argument('--target', choices=('file', 'jena'), default='jena',
+                        help='Where to write the result: XML files in onto/owl (file) or the Jena dataset (jena). Default: jena.')
+    parser.add_argument('--what', choices=('schema', 'data', 'all'), default='all',
+                        help='What to publish in Jena: only the schema, only the instances or both. Default: all. Ignored with --target file.')
+    parser.add_argument('--sources', type=_comma_separated(ALL_SOURCES, 'source'), default=DEFAULT_SOURCES,
+                        help='Sources to walk, comma separated (%s). Default: %s.' % (', '.join(ALL_SOURCES), ', '.join(DEFAULT_SOURCES)))
+    parser.add_argument('--seeds', type=_comma_separated(ALL_SEEDS, 'seed'), default=DEFAULT_SEEDS,
+                        help='Seeds to sow, comma separated (%s). Default: none.' % ', '.join(ALL_SEEDS))
+    reduced_group = parser.add_mutually_exclusive_group()
+    reduced_group.add_argument('--reduced', dest='reduced', action='store_true', default=True,
+                               help='Walk a sample instead of all the records (default).')
+    reduced_group.add_argument('--full', dest='reduced', action='store_false',
+                               help='Walk all the records.')
+    parser.add_argument('--skip', type=int, default=None, help='Skip the first N records of each source.')
+    parser.add_argument('--limit', type=int, default=None, help='Process at most N records per source.')
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    walk_kwargs = {
+        'sources': args.sources,
+        'seeds': args.seeds,
+        'reduced': args.reduced,
+        'skip': args.skip,
+        'limit': args.limit,
+    }
+    if args.target == 'file':
+        serialize_file(**walk_kwargs)
+        return
+    if args.what == 'schema':
+        asyncio.run(serialize_schema_jena())
+    elif args.what == 'data':
+        asyncio.run(serialize_jena(**walk_kwargs))
+    else:
+        asyncio.run(serialize_all(**walk_kwargs))
+
+
+if __name__ == '__main__':
+    main()
